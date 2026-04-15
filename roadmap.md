@@ -36,16 +36,16 @@ Create a controlled implementation environment and baseline metrics before touch
 
 ### Tasks
 
-- [ ] Create branch strategy and naming convention (`phase-X/*`, `hotfix/*`).
-- [ ] Add top-level docs:
-  - [ ] `docs/architecture/current-state.md`
-  - [ ] `docs/architecture/target-state.md`
-  - [ ] `docs/testing/test-matrix.md`
-  - [ ] `DECISIONS.md`
-- [ ] Add Make targets/scripts for repeatable checks:
-  - [ ] build both projects
-  - [ ] run unit tests
-  - [ ] run lint/static checks
+- [x] Create branch strategy and naming convention (`phase-X/*`, `hotfix/*`).
+- [x] Add top-level docs:
+  - [x] `docs/architecture/current-state.md`
+  - [x] `docs/architecture/target-state.md`
+  - [x] `docs/testing/test-matrix.md`
+  - [x] `DECISIONS.md`
+- [x] Add Make targets/scripts for repeatable checks:
+  - [x] build both projects
+  - [x] run unit tests
+  - [x] run lint/static checks
 - [ ] Record baseline performance on both standalone projects:
   - [ ] throughput up/down
   - [ ] p50/p95 latency
@@ -54,8 +54,8 @@ Create a controlled implementation environment and baseline metrics before touch
 
 ### Done Criteria
 
-- [ ] Baseline report exists in `docs/testing/baseline.md`
-- [ ] Reproducible local CI commands documented
+- [x] Baseline report exists in `docs/testing/baseline.md`
+- [x] Reproducible local CI commands documented
 
 ---
 
