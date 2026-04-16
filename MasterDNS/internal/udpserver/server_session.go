@@ -682,16 +682,23 @@ func buildPreSessionPacketTypes() [256]bool {
 }
 
 func (s *Server) handleSessionInitRequest(questionPacket []byte, decision domainMatcher.Decision, vpnPacket VpnProto.Packet) []byte {
-	if vpnPacket.SessionID != 0 || len(vpnPacket.Payload) != sessionInitDataSize {
+	if vpnPacket.SessionID != 0 || len(vpnPacket.Payload) < sessionInitDataSize {
 		return nil
 	}
+
+	requestedHybrid, hasRequestedHybrid, err := VpnProto.ParseSessionInitHybridCapabilities(vpnPacket.Payload)
+	if err != nil {
+		return nil
+	}
+
+	initSignaturePayload := vpnPacket.Payload[:sessionInitDataSize]
 
 	requestedUpload, requestedDownload := compression.SplitPair(vpnPacket.Payload[1])
 	resolvedUpload := resolveCompressionType(requestedUpload, s.uploadCompressionMask)
 	resolvedDownload := resolveCompressionType(requestedDownload, s.downloadCompressionMask)
 
 	record, reused, err := s.sessions.findOrCreate(
-		vpnPacket.Payload,
+		initSignaturePayload,
 		resolvedUpload,
 		resolvedDownload,
 		s.cfg.EffectiveMaxPacketsPerBatch(),
@@ -715,6 +722,25 @@ func (s *Server) handleSessionInitRequest(questionPacket []byte, decision domain
 	}
 	record.streamCleanup = s.cleanupStreamArtifacts
 
+	negotiatedHybrid := VpnProto.SessionHybridCapabilities{
+		HybridSupported: hasRequestedHybrid && requestedHybrid.HybridSupported,
+		MaxFeedbackRate: uint16(s.cfg.ClientMaxPacketsPerBatch),
+		MaxStreams:      uint16(min(s.cfg.MaxAllowedClientActiveStreams, int(^uint16(0)))),
+	}
+
+	if hasRequestedHybrid {
+		if requestedHybrid.MaxFeedbackRate > 0 {
+			negotiatedHybrid.MaxFeedbackRate = min(requestedHybrid.MaxFeedbackRate, negotiatedHybrid.MaxFeedbackRate)
+		}
+		if requestedHybrid.MaxStreams > 0 {
+			negotiatedHybrid.MaxStreams = min(requestedHybrid.MaxStreams, negotiatedHybrid.MaxStreams)
+		}
+	}
+
+	record.HybridSupported = negotiatedHybrid.HybridSupported
+	record.HybridMaxFeedbackRate = negotiatedHybrid.MaxFeedbackRate
+	record.HybridMaxStreams = negotiatedHybrid.MaxStreams
+
 	if !reused && s.log != nil {
 		s.log.Infof(
 			"\U0001F9DD <green>Session Created, ID: <cyan>%d</cyan>, Mode: <cyan>%s</cyan>, Upload Compression: <cyan>%s</cyan>, Download Compression: <cyan>%s</cyan>, Client Upload MTU: <cyan>%d</cyan>, Client Download MTU: <cyan>%d</cyan>, Max Packed Blocks: <cyan>%d</cyan></green>",
@@ -733,6 +759,8 @@ func (s *Server) handleSessionInitRequest(questionPacket []byte, decision domain
 		SessionCookie:   record.Cookie,
 		CompressionPair: compression.PackPair(record.UploadCompression, record.DownloadCompression),
 		VerifyCode:      record.VerifyCode,
+		NegotiatedHybridCapabilities: negotiatedHybrid,
+		HasHybridCapabilitySync:      hasRequestedHybrid,
 		ClientPolicy: VpnProto.SessionAcceptClientPolicy{
 			MaxPacketDuplicationCount: s.cfg.ClientMaxPacketDuplicationCount,
 			MaxSetupDuplicationCount:  s.cfg.ClientMaxSetupDuplicationCount,

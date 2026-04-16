@@ -64,6 +64,18 @@ func (s *Server) dispatchPostSessionPacket(vpnPacket VpnProto.Packet, sessionRec
 		return s.handleStreamCloseWriteRequest(vpnPacket)
 	case Enums.PACKET_STREAM_RST:
 		return s.handleStreamRSTRequest(vpnPacket)
+	case Enums.PACKET_HYBRID_STREAM_OPEN,
+		Enums.PACKET_HYBRID_STREAM_OPEN_ACK,
+		Enums.PACKET_HYBRID_STREAM_CLOSE,
+		Enums.PACKET_HYBRID_STREAM_CLOSE_ACK,
+		Enums.PACKET_HYBRID_STREAM_RESET,
+		Enums.PACKET_HYBRID_STREAM_RESET_ACK,
+		Enums.PACKET_HYBRID_DOWN_ACK,
+		Enums.PACKET_HYBRID_DOWN_NACK,
+		Enums.PACKET_HYBRID_STATS,
+		Enums.PACKET_HYBRID_HEARTBEAT,
+		Enums.PACKET_HYBRID_KEY_ROTATION:
+		return true
 	default:
 		return false
 	}
@@ -124,7 +136,7 @@ func (s *Server) ackRecentlyClosedStreamPacket(record *sessionRecord, vpnPacket 
 
 func isStreamCreationPacketType(packetType uint8) bool {
 	switch packetType {
-	case Enums.PACKET_STREAM_SYN, Enums.PACKET_SOCKS5_SYN:
+	case Enums.PACKET_STREAM_SYN, Enums.PACKET_SOCKS5_SYN, Enums.PACKET_HYBRID_STREAM_OPEN:
 		return true
 	default:
 		return false
@@ -275,7 +287,9 @@ func (s *Server) preprocessInboundPacket(vpnPacket VpnProto.Packet) bool {
 	}
 
 	if vpnPacket.StreamID != 0 && (!streamExists || existingStream == nil) {
-		return s.enqueueMissingStreamReset(record, vpnPacket)
+		if !isStreamCreationPacketType(vpnPacket.PacketType) {
+			return s.enqueueMissingStreamReset(record, vpnPacket)
+		}
 	}
 
 	switch vpnPacket.PacketType {

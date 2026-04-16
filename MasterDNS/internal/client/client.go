@@ -75,6 +75,9 @@ type Client struct {
 	sessionID             uint8
 	sessionCookie         uint8
 	responseMode          uint8
+	hybridSupported       bool
+	hybridMaxFeedbackRate uint16
+	hybridMaxStreams      uint16
 	sessionReady          bool
 	initStateMu           sync.Mutex
 	sessionInitReady      bool
@@ -508,6 +511,14 @@ func (c *Client) HandleStreamPacket(packet VpnProto.Packet) error {
 		if arqObj.HandleDataNack(packet.SequenceNum) {
 			c.balancer.NoteStreamProgress(packet.StreamID)
 		}
+	case Enums.PACKET_HYBRID_DOWN_NACK:
+		if arqObj.IsClosed() || !s.TerminalSince().IsZero() {
+			return nil
+		}
+
+		if arqObj.HandleDataNack(packet.SequenceNum) {
+			c.balancer.NoteStreamProgress(packet.StreamID)
+		}
 	case Enums.PACKET_STREAM_CONNECTED:
 		return c.handleStreamConnected(packet, s, arqObj)
 	case Enums.PACKET_STREAM_CONNECT_FAIL:
@@ -516,7 +527,11 @@ func (c *Client) HandleStreamPacket(packet VpnProto.Packet) error {
 		arqObj.MarkCloseReadReceived()
 	case Enums.PACKET_STREAM_CLOSE_WRITE:
 		arqObj.MarkCloseWriteReceived()
+	case Enums.PACKET_HYBRID_STREAM_CLOSE:
+		arqObj.MarkCloseReadReceived()
 	case Enums.PACKET_STREAM_RST:
+		fallthrough
+	case Enums.PACKET_HYBRID_STREAM_RESET:
 		arqObj.MarkRstReceived()
 		arqObj.Close("peer reset received", arq.CloseOptions{Force: true})
 		s.MarkTerminal(time.Now())

@@ -36,6 +36,8 @@ const (
 	sessionBusyPayloadSize      = 4
 	sessionCloseBurstMaxTargets = 10
 	sessionCloseBurstRounds     = 3
+	defaultClientHybridMaxFeedbackRate = 120
+	defaultClientHybridMaxStreams      = 1024
 )
 
 func (c *Client) InitializeSession(maxAttempts int) error {
@@ -165,6 +167,11 @@ func (c *Client) applySessionInitPacket(packet VpnProto.Packet, initPayload []by
 		c.sessionCookie = sessionAccept.SessionCookie
 		c.responseMode = initPayload[0]
 		c.uploadCompression, c.downloadCompression = compression.SplitPair(sessionAccept.CompressionPair)
+		if sessionAccept.HasHybridCapabilitySync {
+			c.hybridSupported = sessionAccept.NegotiatedHybridCapabilities.HybridSupported
+			c.hybridMaxFeedbackRate = sessionAccept.NegotiatedHybridCapabilities.MaxFeedbackRate
+			c.hybridMaxStreams = sessionAccept.NegotiatedHybridCapabilities.MaxStreams
+		}
 		if sessionAccept.HasClientPolicySync {
 			c.applySessionClientPolicy(sessionAccept.ClientPolicy)
 		}
@@ -365,6 +372,14 @@ func (c *Client) buildSessionInitPayload() ([]byte, bool, [4]byte, error) {
 	binary.BigEndian.PutUint16(payload[2:4], uint16(c.syncedUploadMTU))
 	binary.BigEndian.PutUint16(payload[4:6], uint16(c.syncedDownloadMTU))
 	copy(payload[6:10], verifyCode[:])
+
+	capabilities := VpnProto.SessionHybridCapabilities{
+		HybridSupported: true,
+		MaxFeedbackRate: defaultClientHybridMaxFeedbackRate,
+		MaxStreams:      defaultClientHybridMaxStreams,
+	}
+	payload = VpnProto.AppendSessionInitHybridCapabilities(payload, capabilities)
+
 	return payload, payload[0] == mtuProbeBase64Reply, verifyCode, nil
 }
 

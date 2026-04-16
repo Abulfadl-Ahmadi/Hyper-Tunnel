@@ -47,6 +47,9 @@ type sessionRecord struct {
 	DownloadMTU                         uint16
 	DownloadMTUBytes                    int
 	VerifyCode                          [4]byte
+	HybridSupported                     bool
+	HybridMaxFeedbackRate               uint16
+	HybridMaxStreams                    uint16
 	Signature                           [sessionInitDataSize]byte
 	MaxPackedBlocks                     int
 	StreamReadBufferSize                int

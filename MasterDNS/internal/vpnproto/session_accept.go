@@ -10,6 +10,7 @@ const (
 	SessionAcceptBasePayloadSize   = 7
 	SessionAcceptPolicyPayloadSize = 13
 	SessionAcceptPayloadSize       = SessionAcceptBasePayloadSize + SessionAcceptPolicyPayloadSize
+	SessionAcceptCapabilityPayloadSize = SessionHybridCapabilityPayloadSize
 
 	SessionPolicyScaledMin = 0.05
 	SessionPolicyScaledMax = 1.0
@@ -38,6 +39,8 @@ type SessionAcceptPayload struct {
 	VerifyCode          [4]byte
 	ClientPolicy        SessionAcceptClientPolicy
 	HasClientPolicySync bool
+	NegotiatedHybridCapabilities SessionHybridCapabilities
+	HasHybridCapabilitySync      bool
 }
 
 type SessionAcceptClientSettings struct {
@@ -91,6 +94,9 @@ func EncodeSessionAcceptPayload(payload SessionAcceptPayload) []byte {
 	if payload.HasClientPolicySync {
 		size = SessionAcceptPayloadSize
 	}
+	if payload.HasHybridCapabilitySync {
+		size += SessionAcceptCapabilityPayloadSize
+	}
 
 	buf := make([]byte, size)
 	buf[0] = payload.SessionID
@@ -101,6 +107,11 @@ func EncodeSessionAcceptPayload(payload SessionAcceptPayload) []byte {
 	if payload.HasClientPolicySync {
 		policy := EncodeSessionAcceptClientPolicy(payload.ClientPolicy)
 		copy(buf[SessionAcceptBasePayloadSize:], policy[:])
+	}
+
+	if payload.HasHybridCapabilitySync {
+		capabilities := EncodeSessionHybridCapabilities(payload.NegotiatedHybridCapabilities)
+		copy(buf[size-SessionAcceptCapabilityPayloadSize:], capabilities[:])
 	}
 
 	return buf
@@ -125,6 +136,20 @@ func DecodeSessionAcceptPayload(payload []byte) (SessionAcceptPayload, error) {
 		}
 		result.ClientPolicy = policy
 		result.HasClientPolicySync = true
+	}
+
+	capabilityOffset := SessionAcceptBasePayloadSize
+	if result.HasClientPolicySync {
+		capabilityOffset = SessionAcceptPayloadSize
+	}
+
+	if len(payload) >= capabilityOffset+SessionAcceptCapabilityPayloadSize {
+		capabilities, err := DecodeSessionHybridCapabilities(payload[capabilityOffset : capabilityOffset+SessionAcceptCapabilityPayloadSize])
+		if err != nil {
+			return SessionAcceptPayload{}, err
+		}
+		result.NegotiatedHybridCapabilities = capabilities
+		result.HasHybridCapabilitySync = true
 	}
 
 	return result, nil

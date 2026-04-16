@@ -31,6 +31,11 @@ func TestIsPackableControlPacketIncludesSmallSocksResults(t *testing.T) {
 		Enums.PACKET_SOCKS5_UPSTREAM_UNAVAILABLE_ACK,
 		Enums.PACKET_SOCKS5_CONNECTED,
 		Enums.PACKET_SOCKS5_CONNECTED_ACK,
+		Enums.PACKET_HYBRID_STREAM_OPEN_ACK,
+		Enums.PACKET_HYBRID_STREAM_CLOSE_ACK,
+		Enums.PACKET_HYBRID_STREAM_RESET_ACK,
+		Enums.PACKET_HYBRID_DOWN_ACK,
+		Enums.PACKET_HYBRID_DOWN_NACK,
 	}
 
 	for _, packetType := range packetTypes {

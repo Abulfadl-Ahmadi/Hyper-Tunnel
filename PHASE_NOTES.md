@@ -70,6 +70,124 @@ All implementations in Phase 1+ must maintain binary compatibility backward unle
 
 ---
 
-## Phase 1+ (Pending)
+## Phase 1 - Unified Architecture and Contracts
+
+**Completion Date:** 2026-04-16
+
+### Summary
+
+Phase 1 establishes strict contracts before runtime wiring. It introduces canonical IDs,
+control-plane frame contracts, downstream frame header contracts, and version/feature
+compatibility behavior in both code stubs and docs.
+
+### Deliverables
+
+- `internal/hybridbridge/types.go`
+  - Canonical IDs: `HybridSessionID`, `HybridStreamID`, `DownSeq`, `KeyEpoch`
+  - Versioning: `ProtocolVersion`, `FeatureFlags`
+  - Control frame contracts and frame stubs:
+    - stream open/ack/close/reset
+    - downstream ACK/NACK feedback
+    - stats and heartbeat
+    - key-rotation signal
+  - Downstream frame header contract
+
+- `docs/protocol/hybrid-control.md`
+  - Frame type catalog
+  - Canonical ID mapping
+  - Version/feature compatibility strategy
+
+- `docs/protocol/hybrid-downstream.md`
+  - Header field contract and byte layout
+  - Serialization rules and compatibility behavior
+
+### Notes
+
+- This phase intentionally defines contracts only (no packet parse/build integration yet).
+- Runtime behavior and transport integration begin in Phase 2.
+
+---
+
+## Phase 2+ (Pending)
 
 Notes for subsequent phases will be added as work completes.
+
+---
+
+## Phase 2 - MasterDNS Control-Plane Extension (In Progress)
+
+**Last Update:** 2026-04-16
+
+### Completed in this update
+
+- Added hybrid control packet enum values and packet-name mappings:
+  - `MasterDNS/internal/enums/dns.go`
+  - `MasterDNS/internal/enums/dns_names.go`
+
+- Extended `vpnproto` packet behavior for hybrid packet types:
+  - Updated `buildPacketFlags()` in `MasterDNS/internal/vpnproto/parser.go`
+    to classify hybrid packet types under valid and stream+sequence sets.
+  - Extended packed-control eligibility for hybrid ACK/NACK controls in
+    `MasterDNS/internal/vpnproto/packing.go`.
+
+- Integrated hybrid control routing in client/server paths:
+  - Client registration in `MasterDNS/internal/client/handlers/stream_handlers.go`
+  - Server post-session dispatch acceptance in
+    `MasterDNS/internal/udpserver/server_postsession.go`
+  - Stream-creation and missing-stream handling adjustments for
+    `PACKET_HYBRID_STREAM_OPEN`.
+
+- Added hybrid ACK/close semantics and packet priorities:
+  - `MasterDNS/internal/enums/packet_ack.go`
+  - `MasterDNS/internal/enums/packet_priority.go`
+
+- Added/extended tests for hybrid behavior:
+  - `MasterDNS/internal/vpnproto/parser_test.go`
+  - `MasterDNS/internal/vpnproto/packing_test.go`
+  - `MasterDNS/internal/enums/packet_ack_test.go`
+  - `MasterDNS/internal/enums/packet_priority_test.go`
+
+### Remaining for Phase 2
+
+- Runtime verification of hybrid control roundtrip between client and server.
+
+### Session capability negotiation implemented
+
+- `SESSION_INIT` now supports an optional hybrid capability extension block:
+  - hybrid supported flag
+  - max feedback rate
+  - max stream count
+- Server parses capability offers and negotiates bounded values during
+  `handleSessionInitRequest`.
+- `SESSION_ACCEPT` now returns negotiated capability values as an optional
+  extension block (while preserving legacy payload compatibility).
+- Client consumes negotiated values from `SESSION_ACCEPT` and stores them in
+  runtime session state.
+
+### Spoof protocol extension (alignment prep)
+
+- Added backward-compatible hybrid capability codecs to
+  `spoof-tunnel/internal/protocol/packet.go`.
+- Added optional INIT payload extension helpers for capability metadata:
+  - `NewInitPacketWithHybridCapabilities`
+  - `ParseInitWithHybridCapabilities`
+- Added protocol unit tests in
+  `spoof-tunnel/internal/protocol/packet_test.go` for:
+  - capability codec roundtrip
+  - INIT payload with capabilities
+  - legacy INIT payload without capabilities
+
+### Spoof runtime handshake integration
+
+- Client INIT send paths in `spoof-tunnel/internal/tunnel/client.go` now use
+  `NewInitPacketWithHybridCapabilities` to advertise capabilities.
+- Server INIT handling in `spoof-tunnel/internal/tunnel/server.go` now uses
+  `ParseInitWithHybridCapabilities` with graceful rejection on malformed
+  capability extension payloads.
+- Server session state now records client-offered hybrid capabilities for
+  future runtime policy integration.
+
+### Validation Status
+
+- Code and tests were added/updated.
+- Local test execution remains blocked in this workspace because Go is not installed.

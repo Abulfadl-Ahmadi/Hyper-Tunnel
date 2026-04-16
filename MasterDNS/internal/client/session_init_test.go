@@ -10,6 +10,34 @@ import (
 	VpnProto "masterdnsvpn-go/internal/vpnproto"
 )
 
+func TestBuildSessionInitPayloadIncludesHybridCapabilities(t *testing.T) {
+	c := buildTestClientWithResolvers(config.ClientConfig{}, "a")
+	c.syncedUploadMTU = 150
+	c.syncedDownloadMTU = 500
+
+	payload, _, _, err := c.buildSessionInitPayload()
+	if err != nil {
+		t.Fatalf("buildSessionInitPayload returned error: %v", err)
+	}
+
+	decoded, has, err := VpnProto.ParseSessionInitHybridCapabilities(payload)
+	if err != nil {
+		t.Fatalf("ParseSessionInitHybridCapabilities returned error: %v", err)
+	}
+	if !has {
+		t.Fatal("expected hybrid capability block in session init payload")
+	}
+	if !decoded.HybridSupported {
+		t.Fatal("expected hybrid support capability to be enabled")
+	}
+	if decoded.MaxFeedbackRate == 0 {
+		t.Fatal("expected non-zero max feedback rate capability")
+	}
+	if decoded.MaxStreams == 0 {
+		t.Fatal("expected non-zero max streams capability")
+	}
+}
+
 func TestNextSessionInitAttemptUsesBalancerSnapshotConnection(t *testing.T) {
 	c := buildTestClientWithResolvers(config.ClientConfig{}, "a", "b")
 	connections := []*Connection{

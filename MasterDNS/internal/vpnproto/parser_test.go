@@ -136,3 +136,49 @@ func TestParseFromLabels(t *testing.T) {
 		t.Fatalf("unexpected payload: got=%q want=%q", parsed.Payload, payload)
 	}
 }
+
+func TestParseHybridDownAckPacket(t *testing.T) {
+	payload := []byte("hybrid-ack")
+	raw := buildRawPacket(t, 9, Enums.PACKET_HYBRID_DOWN_ACK, 0x0102, 0x0304, 0, 0, 0, 6, payload)
+
+	parsed, err := Parse(raw)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	if !parsed.HasStreamID || parsed.StreamID != 0x0102 {
+		t.Fatalf("unexpected stream id: %+v", parsed)
+	}
+	if !parsed.HasSequenceNum || parsed.SequenceNum != 0x0304 {
+		t.Fatalf("unexpected sequence number: %+v", parsed)
+	}
+	if parsed.HasFragmentInfo || parsed.HasCompressionType {
+		t.Fatalf("unexpected fragment/compression fields for hybrid down ack: %+v", parsed)
+	}
+	if parsed.HeaderLength != 8 {
+		t.Fatalf("unexpected header length: got=%d want=%d", parsed.HeaderLength, 8)
+	}
+	if !bytes.Equal(parsed.Payload, payload) {
+		t.Fatalf("unexpected payload: got=%q want=%q", parsed.Payload, payload)
+	}
+}
+
+func TestParseHybridStatsPacket(t *testing.T) {
+	payload := []byte("stats")
+	raw := buildRawPacket(t, 2, Enums.PACKET_HYBRID_STATS, 0, 0, 0, 0, 0, 7, payload)
+
+	parsed, err := Parse(raw)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	if parsed.HasStreamID || parsed.HasSequenceNum || parsed.HasFragmentInfo || parsed.HasCompressionType {
+		t.Fatalf("unexpected optional fields for hybrid stats: %+v", parsed)
+	}
+	if parsed.HeaderLength != 4 {
+		t.Fatalf("unexpected header length: got=%d want=%d", parsed.HeaderLength, 4)
+	}
+	if !bytes.Equal(parsed.Payload, payload) {
+		t.Fatalf("unexpected payload: got=%q want=%q", parsed.Payload, payload)
+	}
+}

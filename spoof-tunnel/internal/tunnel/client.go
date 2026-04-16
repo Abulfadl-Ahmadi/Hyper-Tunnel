@@ -56,6 +56,7 @@ type Client struct {
 type ClientSession struct {
 	ID         uint32
 	Target     string
+	OfferedCaps protocol.HybridCapabilities
 	LocalConn  net.Conn
 	Created    time.Time
 	LastActive time.Time
@@ -76,6 +77,29 @@ type ClientSession struct {
 	// State
 	closed atomic.Bool
 	mu     sync.Mutex
+}
+
+func clampUint16(value int) uint16 {
+	if value < 0 {
+		return 0
+	}
+	if value > 0xFFFF {
+		return 0xFFFF
+	}
+	return uint16(value)
+}
+
+func (c *Client) buildOfferedHybridCapabilities() protocol.HybridCapabilities {
+	feedbackRate := c.config.Performance.SendRateLimit
+	if feedbackRate <= 0 {
+		feedbackRate = 1000
+	}
+
+	return protocol.HybridCapabilities{
+		HybridSupported: true,
+		MaxFeedbackRate: clampUint16(feedbackRate),
+		MaxStreams:      clampUint16(c.config.Reliability.WindowSize),
+	}
 }
 
 // NewClient creates a new tunnel client
@@ -220,12 +244,14 @@ func (c *Client) handleConnect(target string) (net.Conn, error) {
 	sessionID := c.generateSessionID()
 
 	// Create session
+	offeredCaps := c.buildOfferedHybridCapabilities()
 	sess := &ClientSession{
-		ID:         sessionID,
-		Target:     target,
-		Created:    time.Now(),
-		LastActive: time.Now(),
-		recvCh:     make(chan []byte, 256),
+		ID:          sessionID,
+		Target:      target,
+		OfferedCaps: offeredCaps,
+		Created:     time.Now(),
+		LastActive:  time.Now(),
+		recvCh:      make(chan []byte, 256),
 	}
 
 	c.sessionsMu.Lock()
@@ -233,7 +259,7 @@ func (c *Client) handleConnect(target string) (net.Conn, error) {
 	c.sessionsMu.Unlock()
 
 	// Send INIT packet to server
-	initPacket := protocol.NewInitPacket(sessionID, target)
+	initPacket := protocol.NewInitPacketWithHybridCapabilities(sessionID, target, offeredCaps)
 	if err := c.sendPacket(initPacket); err != nil {
 		c.removeSession(sessionID)
 		return nil, fmt.Errorf("send init: %w", err)
@@ -285,14 +311,16 @@ func (c *Client) handleStream(target string, tcpConn net.Conn) error {
 	sessionID := c.generateSessionID()
 
 	// Create session with TCP connection for direct download writes
+	offeredCaps := c.buildOfferedHybridCapabilities()
 	sess := &ClientSession{
-		ID:         sessionID,
-		Target:     target,
-		LocalConn:  tcpConn, // Store real TCP conn for direct writes
-		Created:    time.Now(),
-		LastActive: time.Now(),
-		recvCh:     make(chan []byte, 512), // Larger buffer
-		uploadSeq:  1,                      // Start sequence at 1
+		ID:          sessionID,
+		Target:      target,
+		OfferedCaps: offeredCaps,
+		LocalConn:   tcpConn, // Store real TCP conn for direct writes
+		Created:     time.Now(),
+		LastActive:  time.Now(),
+		recvCh:      make(chan []byte, 512), // Larger buffer
+		uploadSeq:   1,                      // Start sequence at 1
 	}
 
 	// Initialize SendBuffer for reliable upload if enabled
@@ -317,7 +345,7 @@ func (c *Client) handleStream(target string, tcpConn net.Conn) error {
 	c.sessionsMu.Unlock()
 
 	// Send INIT packet to server
-	initPacket := protocol.NewInitPacket(sessionID, target)
+	initPacket := protocol.NewInitPacketWithHybridCapabilities(sessionID, target, offeredCaps)
 	if err := c.sendPacket(initPacket); err != nil {
 		c.removeSession(sessionID)
 		tcpConn.Close()

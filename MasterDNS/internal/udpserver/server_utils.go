@@ -55,6 +55,11 @@ func (s *Server) buildNoDataResponseLiteLogged(packet []byte, parsed DnsParser.L
 func isClosedStreamAwarePacketType(packetType uint8) bool {
 	switch packetType {
 	case Enums.PACKET_STREAM_SYN,
+		Enums.PACKET_HYBRID_STREAM_OPEN,
+		Enums.PACKET_HYBRID_STREAM_CLOSE,
+		Enums.PACKET_HYBRID_STREAM_RESET,
+		Enums.PACKET_HYBRID_DOWN_ACK,
+		Enums.PACKET_HYBRID_DOWN_NACK,
 		Enums.PACKET_STREAM_DATA,
 		Enums.PACKET_STREAM_RESEND,
 		Enums.PACKET_STREAM_DATA_ACK,

@@ -30,6 +30,9 @@ const (
 
 	// MaxPacketSize is the maximum packet size
 	MaxPacketSize = 65535
+
+	// Hybrid capability payload extension sizes
+	HybridCapabilityPayloadSize = 5
 )
 
 var (
@@ -45,6 +48,16 @@ type Packet struct {
 	SessionID uint32
 	Type      byte
 	Payload   []byte
+}
+
+// HybridCapabilities describes negotiated hybrid control capabilities.
+// Wire format is compact and endian-stable:
+// [Flags:1][MaxFeedbackRate:2][MaxStreams:2]
+// Flags bit0 => hybrid supported.
+type HybridCapabilities struct {
+	HybridSupported bool
+	MaxFeedbackRate uint16
+	MaxStreams      uint16
 }
 
 // Header represents just the packet header for quick parsing
@@ -180,6 +193,84 @@ func NewInitPacket(sessionID uint32, target string) *Packet {
 		Type:      PacketInit,
 		Payload:   []byte(target),
 	}
+}
+
+// EncodeHybridCapabilities serializes hybrid capability metadata into a fixed-size payload.
+func EncodeHybridCapabilities(capabilities HybridCapabilities) [HybridCapabilityPayloadSize]byte {
+	var payload [HybridCapabilityPayloadSize]byte
+	if capabilities.HybridSupported {
+		payload[0] = 0x01
+	}
+	binary.BigEndian.PutUint16(payload[1:3], capabilities.MaxFeedbackRate)
+	binary.BigEndian.PutUint16(payload[3:5], capabilities.MaxStreams)
+	return payload
+}
+
+// DecodeHybridCapabilities parses a fixed-size hybrid capability payload.
+func DecodeHybridCapabilities(payload []byte) (HybridCapabilities, error) {
+	if len(payload) < HybridCapabilityPayloadSize {
+		return HybridCapabilities{}, fmt.Errorf("hybrid capability payload too small: got=%d want>=%d", len(payload), HybridCapabilityPayloadSize)
+	}
+
+	return HybridCapabilities{
+		HybridSupported: payload[0]&0x01 != 0,
+		MaxFeedbackRate: binary.BigEndian.Uint16(payload[1:3]),
+		MaxStreams:      binary.BigEndian.Uint16(payload[3:5]),
+	}, nil
+}
+
+// NewInitPacketWithHybridCapabilities creates an INIT packet that appends
+// capability metadata after a NULL separator:
+// [TargetUTF8...][0x00][CapabilityPayload:5]
+func NewInitPacketWithHybridCapabilities(sessionID uint32, target string, capabilities HybridCapabilities) *Packet {
+	payload := make([]byte, len(target)+1+HybridCapabilityPayloadSize)
+	copy(payload, []byte(target))
+	payload[len(target)] = 0
+	encoded := EncodeHybridCapabilities(capabilities)
+	copy(payload[len(target)+1:], encoded[:])
+
+	return &Packet{
+		SessionID: sessionID,
+		Type:      PacketInit,
+		Payload:   payload,
+	}
+}
+
+// ParseInitWithHybridCapabilities parses INIT payloads with optional appended
+// capability metadata after a NULL separator.
+func ParseInitWithHybridCapabilities(payload []byte) (target string, capabilities HybridCapabilities, hasCapabilities bool, err error) {
+	if len(payload) == 0 {
+		return "", HybridCapabilities{}, false, nil
+	}
+
+	sep := -1
+	for i, b := range payload {
+		if b == 0 {
+			sep = i
+			break
+		}
+	}
+
+	if sep < 0 {
+		return string(payload), HybridCapabilities{}, false, nil
+	}
+
+	target = string(payload[:sep])
+	remaining := payload[sep+1:]
+	if len(remaining) == 0 {
+		return target, HybridCapabilities{}, false, nil
+	}
+
+	if len(remaining) < HybridCapabilityPayloadSize {
+		return "", HybridCapabilities{}, false, fmt.Errorf("init capability payload too small: got=%d want>=%d", len(remaining), HybridCapabilityPayloadSize)
+	}
+
+	decoded, decodeErr := DecodeHybridCapabilities(remaining[:HybridCapabilityPayloadSize])
+	if decodeErr != nil {
+		return "", HybridCapabilities{}, false, decodeErr
+	}
+
+	return target, decoded, true, nil
 }
 
 // NewInitAckPacket creates an init acknowledgment packet

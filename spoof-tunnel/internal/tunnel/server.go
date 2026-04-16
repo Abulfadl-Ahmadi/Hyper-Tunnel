@@ -60,6 +60,8 @@ type ServerSession struct {
 	ClientAddr net.IP
 	ClientPort uint16
 	Target     string
+	ClientOfferedHybridCapabilities protocol.HybridCapabilities
+	HasClientHybridCapabilities     bool
 	TargetConn net.Conn
 	Created    time.Time
 	LastActive time.Time
@@ -308,8 +310,18 @@ func (s *Server) processRecoveredPacket(ciphertext []byte, clientIP net.IP, clie
 
 // handleInit handles connection init requests
 func (s *Server) handleInit(pkt *protocol.Packet, clientSpoofIP net.IP, clientPort uint16) {
-	target := string(pkt.Payload)
+	target, hybridCaps, hasHybridCaps, parseErr := protocol.ParseInitWithHybridCapabilities(pkt.Payload)
+	if parseErr != nil {
+		log.Printf("INIT session %d: invalid payload from spoof=%s port=%d: %v", pkt.SessionID, clientSpoofIP, clientPort, parseErr)
+		ackPkt := protocol.NewInitAckPacket(pkt.SessionID, false, "invalid init payload")
+		s.sendPacket(ackPkt, s.clientRealIP, clientPort)
+		return
+	}
+
 	log.Printf("INIT session %d: target=%s from spoof=%s port=%d", pkt.SessionID, target, clientSpoofIP, clientPort)
+	if hasHybridCaps {
+		log.Printf("INIT session %d: client hybrid capabilities supported=%t max_feedback_rate=%d max_streams=%d", pkt.SessionID, hybridCaps.HybridSupported, hybridCaps.MaxFeedbackRate, hybridCaps.MaxStreams)
+	}
 
 	// Connect to target
 	conn, err := net.DialTimeout("tcp", target, 10*time.Second)
@@ -330,13 +342,15 @@ func (s *Server) handleInit(pkt *protocol.Packet, clientSpoofIP net.IP, clientPo
 
 	// Create session
 	sess := &ServerSession{
-		ID:         pkt.SessionID,
-		ClientAddr: clientSpoofIP,
-		ClientPort: clientPort,
-		Target:     target,
-		TargetConn: conn,
-		Created:    time.Now(),
-		LastActive: time.Now(),
+		ID:                             pkt.SessionID,
+		ClientAddr:                     clientSpoofIP,
+		ClientPort:                     clientPort,
+		Target:                         target,
+		ClientOfferedHybridCapabilities: hybridCaps,
+		HasClientHybridCapabilities:     hasHybridCaps,
+		TargetConn:                     conn,
+		Created:                        time.Now(),
+		LastActive:                     time.Now(),
 	}
 
 	// Initialize RecvBuffer for reliable upload if enabled

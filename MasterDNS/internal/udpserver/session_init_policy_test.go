@@ -96,6 +96,11 @@ func TestHandleSessionInitRequestIncludesServerClientPolicy(t *testing.T) {
 	binary.BigEndian.PutUint16(initPayload[2:4], 220)
 	binary.BigEndian.PutUint16(initPayload[4:6], 5000)
 	copy(initPayload[6:10], verifyCode[:])
+	initPayload = VpnProto.AppendSessionInitHybridCapabilities(initPayload, VpnProto.SessionHybridCapabilities{
+		HybridSupported: true,
+		MaxFeedbackRate: 250,
+		MaxStreams:      1500,
+	})
 
 	response := s.handleSessionInitRequest(query, domainMatcher.Decision{RequestName: "x.v.example.com"}, VpnProto.Packet{
 		SessionID:  0,
@@ -120,6 +125,9 @@ func TestHandleSessionInitRequestIncludesServerClientPolicy(t *testing.T) {
 	}
 	if !accept.HasClientPolicySync {
 		t.Fatal("expected session accept to include client policy sync block")
+	}
+	if !accept.HasHybridCapabilitySync {
+		t.Fatal("expected session accept to include hybrid capability sync block")
 	}
 	if accept.VerifyCode != verifyCode {
 		t.Fatalf("unexpected verify code: got=%v want=%v", accept.VerifyCode, verifyCode)
@@ -156,6 +164,15 @@ func TestHandleSessionInitRequestIncludesServerClientPolicy(t *testing.T) {
 	}
 	if accept.ClientPolicy.MinARQInitialRTOSeconds < 0.245 || accept.ClientPolicy.MinARQInitialRTOSeconds > 0.255 {
 		t.Fatalf("unexpected min arq initial rto: got=%f", accept.ClientPolicy.MinARQInitialRTOSeconds)
+	}
+	if !accept.NegotiatedHybridCapabilities.HybridSupported {
+		t.Fatal("expected negotiated hybrid support to be true")
+	}
+	if accept.NegotiatedHybridCapabilities.MaxFeedbackRate == 0 {
+		t.Fatal("expected negotiated max feedback rate to be non-zero")
+	}
+	if accept.NegotiatedHybridCapabilities.MaxStreams == 0 {
+		t.Fatal("expected negotiated max streams to be non-zero")
 	}
 }
 

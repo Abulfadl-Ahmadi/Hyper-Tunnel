@@ -67,28 +67,28 @@ Define strict interfaces and protocol contracts before implementation.
 
 ### Tasks
 
-- [ ] Create `internal/hybridbridge` design package (types/interfaces only first).
-- [ ] Define canonical IDs:
-  - [ ] `HybridSessionID` (32-bit)
-  - [ ] `HybridStreamID` (32-bit)
-  - [ ] `DownSeq` (64-bit)
-  - [ ] `KeyEpoch` (16-bit)
-- [ ] Define control-plane frame contracts (carried by MasterDNS):
-  - [ ] stream open/ack/close/reset
-  - [ ] downstream ACK/NACK feedback
-  - [ ] stats and heartbeat
-  - [ ] key-rotation signal
-- [ ] Define downstream spoof frame header and serialization format.
-- [ ] Add versioning strategy:
-  - [ ] protocol version byte
-  - [ ] feature flags
-  - [ ] backward compatibility behavior
+- [x] Create `internal/hybridbridge` design package (types/interfaces only first).
+- [x] Define canonical IDs:
+  - [x] `HybridSessionID` (32-bit)
+  - [x] `HybridStreamID` (32-bit)
+  - [x] `DownSeq` (64-bit)
+  - [x] `KeyEpoch` (16-bit)
+- [x] Define control-plane frame contracts (carried by MasterDNS):
+  - [x] stream open/ack/close/reset
+  - [x] downstream ACK/NACK feedback
+  - [x] stats and heartbeat
+  - [x] key-rotation signal
+- [x] Define downstream spoof frame header and serialization format.
+- [x] Add versioning strategy:
+  - [x] protocol version byte
+  - [x] feature flags
+  - [x] backward compatibility behavior
 
 ### Done Criteria
 
-- [ ] `docs/protocol/hybrid-control.md` complete
-- [ ] `docs/protocol/hybrid-downstream.md` complete
-- [ ] compile-safe interface stubs added
+- [x] `docs/protocol/hybrid-control.md` complete
+- [x] `docs/protocol/hybrid-downstream.md` complete
+- [x] compile-safe interface stubs added
 
 ---
 
@@ -100,18 +100,18 @@ Extend MasterDNS to carry hybrid control and downstream feedback safely.
 
 ### Tasks
 
-- [ ] Add new packet enums for hybrid control.
-- [ ] Extend `vpnproto` parsing/building for hybrid control payloads.
-- [ ] Integrate control handlers into client and server dispatch paths.
-- [ ] Add control packet packing compatibility in packed-control blocks path.
-- [ ] Add session capability negotiation during `SESSION_INIT/SESSION_ACCEPT`:
-  - [ ] hybrid supported?
-  - [ ] max feedback rate
-  - [ ] max stream counts
+- [x] Add new packet enums for hybrid control.
+- [x] Extend `vpnproto` parsing/building for hybrid control payloads.
+- [x] Integrate control handlers into client and server dispatch paths.
+- [x] Add control packet packing compatibility in packed-control blocks path.
+- [x] Add session capability negotiation during `SESSION_INIT/SESSION_ACCEPT`:
+  - [x] hybrid supported?
+  - [x] max feedback rate
+  - [x] max stream counts
 
 ### Done Criteria
 
-- [ ] Unit tests for new packet parse/build/roundtrip
+- [x] Unit tests for new packet parse/build/roundtrip
 - [ ] Client/server can exchange hybrid control frames over DNS only
 
 ---
