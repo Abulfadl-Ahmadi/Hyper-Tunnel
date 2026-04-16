@@ -1,0 +1,14 @@
+# Build artifacts
+MasterDNS/masterdnsvpn-client
+MasterDNS/masterdnsvpn-server
+spoof-tunnel/spoof
+
+# Go test cache
+*.test
+*.out
+
+# Editor/IDE
+.idea/
+.vscode/
+*.swp
+*.swo
