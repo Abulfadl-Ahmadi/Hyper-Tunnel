@@ -722,10 +722,18 @@ func (s *Server) handleSessionInitRequest(questionPacket []byte, decision domain
 	}
 	record.streamCleanup = s.cleanupStreamArtifacts
 
+	serverMaxStreams := s.cfg.MaxAllowedClientActiveStreams
+	if serverMaxStreams <= 0 {
+		serverMaxStreams = int(^uint16(0))
+	}
+	serverMaxFeedback := s.cfg.ClientMaxPacketsPerBatch
+	if serverMaxFeedback <= 0 {
+		serverMaxFeedback = int(^uint16(0))
+	}
 	negotiatedHybrid := VpnProto.SessionHybridCapabilities{
 		HybridSupported: hasRequestedHybrid && requestedHybrid.HybridSupported,
-		MaxFeedbackRate: uint16(s.cfg.ClientMaxPacketsPerBatch),
-		MaxStreams:      uint16(min(s.cfg.MaxAllowedClientActiveStreams, int(^uint16(0)))),
+		MaxFeedbackRate: uint16(min(serverMaxFeedback, int(^uint16(0)))),
+		MaxStreams:      uint16(min(serverMaxStreams, int(^uint16(0)))),
 	}
 
 	if hasRequestedHybrid {

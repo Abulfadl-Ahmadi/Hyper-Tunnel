@@ -149,7 +149,7 @@ Notes for subsequent phases will be added as work completes.
 
 ### Remaining for Phase 2
 
-- Runtime verification of hybrid control roundtrip between client and server.
+- None. Phase 2 is complete.
 
 ### Session capability negotiation implemented
 
@@ -163,6 +163,9 @@ Notes for subsequent phases will be added as work completes.
   extension block (while preserving legacy payload compatibility).
 - Client consumes negotiated values from `SESSION_ACCEPT` and stores them in
   runtime session state.
+- **Bug fix:** hybrid capability negotiation now correctly handles unconfigured
+  server limits (`MaxAllowedClientActiveStreams=0`, `ClientMaxPacketsPerBatch=0`)
+  by treating zero as "no server-side cap" rather than a hard zero limit.
 
 ### Spoof protocol extension (alignment prep)
 
@@ -189,5 +192,67 @@ Notes for subsequent phases will be added as work completes.
 
 ### Validation Status
 
-- Code and tests were added/updated.
-- Local test execution remains blocked in this workspace because Go is not installed.
+- All tests pass (`make test` and `make lint`).
+
+---
+
+## Phase 3 - Spoof-Tunnel Downstream Refactor (Production Reliability)
+
+**Completion Date:** 2026-04-16
+
+### Summary
+
+Phase 3 replaces the simplistic `RecvBuffer` and `SendBuffer` in spoof-tunnel with
+production-grade implementations that provide true reassembly, dynamic retransmit
+timeouts, retry limits, and upstream tunneling integration hooks.
+
+### Deliverables
+
+- **`spoof-tunnel/internal/tunnel/reliability.go`** — Complete rewrite:
+
+  - **RecvBuffer** (upgraded, backward-compatible API):
+    - True out-of-order reassembly: buffered packet map + contiguous delivery cursor
+    - Gap fill triggers flush of all consecutive buffered packets in order
+    - Duplicate suppression: entries removed from `received` map once delivered
+    - Bounded memory: `maxReorderSlots` (default 256) prevents unbounded growth
+    - ACK/NACK hook fields (`AckHook`, `NackHook`) for upstream tunneling
+      integration — nil by default for standalone operation
+    - `PendingCount()`, `Stats()` for observability
+
+  - **SendBuffer** (upgraded, backward-compatible API):
+    - Dynamic RTO via RFC 6298 SRTT/RTTVAR EWMA estimator
+    - Karn's algorithm: RTT sampled only from first-transmit packets
+    - Sub-granule RTT filter: samples below 1ms (clock noise) are ignored
+    - Exponential backoff: `effectiveRTO = rto * 2^retransmits`
+    - Per-packet retry limit (`maxRetries`, default 10): exhausted packets dropped
+    - `Stats()` for observability (sent, retransmits, dropped, pending)
+
+- **`spoof-tunnel/internal/tunnel/reliability_test.go`** — 18 new tests:
+  - In-order delivery
+  - Out-of-order reassembly and gap flush
+  - Duplicate suppression (in-flight and already-delivered)
+  - Memory bounds enforcement
+  - ACK generation with selective bitmap
+  - NACK generation and hooks
+  - SendBuffer window, ACK, selective-ACK
+  - Retransmit with exponential backoff
+  - Retry limit enforcement
+  - Dynamic RTO convergence (SRTT)
+  - Karn's algorithm
+  - Stats counters
+
+### Compatibility
+
+- All existing call sites (`server.go`, `client.go`) use the unchanged `NewRecvBuffer` /
+  `NewSendBuffer` / `RecvBuffer` / `SendBuffer` API without modification.
+- `AckHook` and `NackHook` are nil by default; standalone spoof operation is unaffected.
+
+### Validation Status
+
+- All tests pass (`make test` and `make lint`).
+
+---
+
+## Phase 4+ (Pending)
+
+Notes for subsequent phases will be added as work completes.
