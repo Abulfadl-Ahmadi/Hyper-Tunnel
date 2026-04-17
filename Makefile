@@ -30,7 +30,7 @@ build-spoof:
 # Test Targets
 # ==============================================================================
 
-test: test-masterdns test-spoof
+test: test-masterdns test-spoof test-hybridbridge
 	@echo "✅ All tests passed"
 
 test-masterdns:
@@ -43,11 +43,16 @@ test-spoof:
 	cd $(SPOOF_TUNNEL_DIR) && go test -v -race -count=1 ./...
 	@echo "✅ Spoof-Tunnel tests passed"
 
+test-hybridbridge:
+	@echo "=== Testing HybridBridge ==="
+	go test -v -race -count=1 ./internal/hybridbridge/...
+	@echo "✅ HybridBridge tests passed"
+
 # ==============================================================================
 # Lint and Static Analysis Targets
 # ==============================================================================
 
-lint: lint-masterdns lint-spoof
+lint: lint-masterdns lint-spoof lint-hybridbridge
 	@echo "✅ Lint checks passed"
 
 lint-masterdns:
@@ -59,6 +64,11 @@ lint-spoof:
 	@echo "=== Linting Spoof-Tunnel ==="
 	cd $(SPOOF_TUNNEL_DIR) && go vet ./...
 	@echo "✅ Spoof-Tunnel vet passed"
+
+lint-hybridbridge:
+	@echo "=== Linting HybridBridge ==="
+	go vet ./internal/hybridbridge/...
+	@echo "✅ HybridBridge vet passed"
 
 vet: lint
 	@echo "✅ All vet checks passed"
@@ -114,9 +124,10 @@ help:
 	@echo "  build            - Build both MasterDNS and Spoof-Tunnel"
 	@echo "  build-masterdns  - Build MasterDNS only"
 	@echo "  build-spoof      - Build Spoof-Tunnel only"
-	@echo "  test             - Run all unit tests"
-	@echo "  test-masterdns   - Test MasterDNS only"
-	@echo "  test-spoof       - Test Spoof-Tunnel only"
+	@echo "  test                 - Run all unit tests"
+	@echo "  test-masterdns       - Test MasterDNS only"
+	@echo "  test-spoof           - Test Spoof-Tunnel only"
+	@echo "  test-hybridbridge    - Test HybridBridge only"
 	@echo "  lint             - Run linters (vet) on all projects"
 	@echo "  lint-masterdns   - Lint MasterDNS only"
 	@echo "  lint-spoof       - Lint Spoof-Tunnel only"
