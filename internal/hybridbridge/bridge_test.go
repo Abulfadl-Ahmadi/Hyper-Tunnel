@@ -511,9 +511,6 @@ func TestDownRxSelectiveBitmapAcksCorrectPackets(t *testing.T) {
 	_, seq3Pending := st.pending[DownSeq(3)]
 	st.mu.Unlock()
 
-	if seq2Pending == false {
-		// seq 2 was NOT in bitmap so should still be pending
-	}
 	if !seq2Pending {
 		t.Fatal("expected seq 2 still pending (not in selective ACK)")
 	}
