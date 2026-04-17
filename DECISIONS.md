@@ -133,6 +133,104 @@ Decisions for Phase 1 and beyond will be added as implementation progresses.
 
 ---
 
+## Phase 2 - MasterDNS Control-Plane Extension
+
+### P2-D01: Hybrid Capability Negotiation Zero-Value Semantics
+
+**Date:** 2026-04-16
+**Status:** Adopted
+**Scope:** MasterDNS session init handling
+
+**Decision:**
+Server-side hybrid capability limits of 0 (`MaxAllowedClientActiveStreams=0`,
+`ClientMaxPacketsPerBatch=0`) are treated as "no server-imposed cap" (unlimited),
+not as a hard cap of zero. When no cap is configured, the server defers to the
+client's offer or uses `uint16` max.
+
+**Rationale:**
+- The zero-value of an unset int in Go should not accidentally reject all streams.
+- Config validation (`Validate()`) already clamps to sane defaults; the session
+  handler must be resilient to unit tests and partial configs.
+- Avoids subtle breakage when the server struct is created without a fully
+  validated config (e.g. in tests or embedded usage).
+
+**Notes:**
+- Fixed failing test `TestHandleSessionInitRequestIncludesServerClientPolicy`.
+
+---
+
+## Phase 3 - Spoof-Tunnel Downstream Refactor
+
+### P3-D01: True Reassembly Buffer for RecvBuffer
+
+**Date:** 2026-04-16
+**Status:** Adopted
+**Scope:** spoof-tunnel reliability layer
+
+**Decision:**
+Replace the simplistic `RecvBuffer` (deliver-only-if-in-order, no reorder
+buffering) with a production reassembly buffer using an out-of-order pending map
+and a contiguous delivery cursor that flushes consecutive packets when gaps fill.
+
+**Rationale:**
+- Under packet reorder (common with ICMP/UDP transport), the old implementation
+  silently discarded out-of-order data, causing TCP-over-tunnel stalls.
+- Bounded by `maxReorderSlots` (default 256) to prevent unbounded memory growth.
+- API is backward-compatible; no changes to server.go/client.go required.
+
+### P3-D02: Dynamic RTO with Karn's Algorithm
+
+**Date:** 2026-04-16
+**Status:** Adopted
+**Scope:** spoof-tunnel reliability layer
+
+**Decision:**
+Replace the fixed-timeout retransmit (`retransmitAge`) with an RFC 6298
+SRTT/RTTVAR EWMA estimator with Karn's algorithm and exponential backoff.
+
+**Rationale:**
+- Static timeout does not adapt to network RTT variance.
+- Karn's algorithm prevents retransmitted-packet RTTs from corrupting the
+  estimator (ambiguity problem).
+- Sub-granule RTT samples (< 1ms, e.g. loopback ACKs in tests) are filtered
+  to prevent spurious RTO changes.
+- Exponential backoff avoids retransmit storms under congestion.
+
+### P3-D03: Retry Limits and Packet Drop
+
+**Date:** 2026-04-16
+**Status:** Adopted
+**Scope:** spoof-tunnel reliability layer
+
+**Decision:**
+Each pending packet has a `retransmits` counter. When `retransmits >= maxRetries`
+(default 10), the packet is dropped from `SendBuffer` on the next
+`GetRetransmitCandidates` call. The caller is NOT notified of the drop.
+
+**Rationale:**
+- Prevents indefinite retransmission of packets to a permanently unreachable
+  destination.
+- Silent drop matches existing error-handling philosophy (log, don't panic).
+- `Stats()` exposes `totalDropped` for monitoring.
+
+### P3-D04: ACK/NACK Hooks for Upstream Tunneling Integration
+
+**Date:** 2026-04-16
+**Status:** Adopted
+**Scope:** spoof-tunnel reliability layer
+
+**Decision:**
+`RecvBuffer` exposes `AckHook func(ackSeqNum uint32, recvBitmap uint64)` and
+`NackHook func(missingSeqs []uint32)` fields. Both default to nil (disabled).
+When set, they are called from `GenerateAck` / `GenerateNack` respectively.
+
+**Rationale:**
+- Allows the Phase 4+ hybrid bridge to intercept ACK/NACK signals and relay
+  them over MasterDNS without modifying the existing server/client data paths.
+- Nil default ensures zero behavioral change for standalone spoof deployment.
+
+---
+
 ## Decision Template
 
 When adding a new decision, use this format:
