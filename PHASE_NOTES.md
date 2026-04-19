@@ -256,3 +256,105 @@ timeouts, retry limits, and upstream tunneling integration hooks.
 ## Phase 4+ (Pending)
 
 Notes for subsequent phases will be added as work completes.
+
+---
+
+## Phase 4 - Bridge Core Implementation
+
+**Completion Date:** 2026-04-17
+
+### Summary
+
+Phase 4 implements the `hybridbridge` runtime manager that connects the MasterDNS
+control-plane (upstream) with the spoof-tunnel downstream data-plane.
+
+### Deliverables
+
+- **`go.mod`** (root) — root Go module `github.com/Abulfadl-Ahmadi/Hyper-Tunnel`
+  enabling the `internal/hybridbridge` package to be compiled and tested
+  independently.
+
+- **`internal/hybridbridge/bridge.go`** — complete `Bridge` runtime:
+
+  - **`ControlPlane` and `DataPlane` interfaces** — abstract the MasterDNS
+    upstream and spoof-tunnel downstream boundaries so neither submodule
+    needs to import the other.
+
+  - **`BridgeConfig` / `DefaultBridgeConfig`** — tuneable parameters
+    (`AckFlushInterval`, `RetransmitInterval`, `MetricsInterval`, `InitialRTO`,
+    `MaxRetransmits`, `MaxSessions`, `MaxStreamsPerSession`).
+
+  - **Stream lifecycle state machine** — five states with clean transitions:
+    `StreamOpening → StreamActive → StreamDraining → StreamClosed`
+    and forced `StreamReset` path.
+
+  - **Session and stream mapping tables** — `sessionEntry` and `streamEntry`
+    with RW-locked maps keyed by `HybridSessionID` and `HybridStreamID`.
+
+  - **Six goroutine loops** (started/stopped atomically via `Start`/`Stop`):
+    - `controlRxLoop` — dispatches inbound control frames from MasterDNS
+      (`StreamOpen`, `StreamOpenAck`, `StreamClose`, `StreamReset`,
+      `DownstreamAck`, `DownstreamNack`, `Heartbeat`, `KeyRotation`).
+    - `downRxLoop` — applies cumulative + selective ACK from spoof-tunnel
+      feedback events; queues upstream ACK/NACK for the next flush.
+    - `schedulerLoop` — downstream send pacing stub (ticker reserved for
+      future congestion-window-driven scheduling).
+    - `ackFlushLoop` — periodically drains pending `DownstreamAck` and
+      `DownstreamNack` frames upstream via `ControlPlane.SendControlFrame`.
+    - `retransmitLoop` — retransmits timed-out downstream packets with
+      exponential backoff; drops packets after `MaxRetransmits` is exceeded.
+    - `metricsLoop` — ticks at `MetricsInterval` and calls `Stats()` as a
+      hook for future Prometheus / structured-log integration.
+
+  - **`SendDownstream`** — public API to send a downstream data frame,
+    allocate a `DownSeq`, track it for retransmission, and emit via
+    `DataPlane.SendDownstream`.
+
+  - **`EnqueueControlRx` / `EnqueueDownRx`** — non-blocking event injection
+    from MasterDNS and spoof-tunnel integration points.
+
+  - **Graceful and forced teardown** — `StreamDraining` waits for all
+    in-flight data to be ACKed before closing; `StreamReset` drops all
+    pending immediately and atomically increments `statsDropped`.
+
+- **`internal/hybridbridge/bridge_test.go`** — 20 unit tests covering:
+  - `Start` / `Stop` lifecycle (idempotent, no-panic)
+  - `StreamOpen` → open-ack → `StreamActive` transition
+  - Rejected `StreamOpenAck` → `StreamReset` + stream removal
+  - `StreamClose` with no pending → immediate finalize
+  - `StreamDraining` → finalize after last ACK
+  - `StreamReset` drops pending and removes stream
+  - `SendDownstream` success, session-not-found, stream-not-active, data-plane error
+  - Downstream cumulative ACK removes pending; queues upstream ACK
+  - Downstream selective ACK bitmap isolates correct packets
+  - Downstream NACK queues upstream NACK
+  - Heartbeat echo
+  - `retransmitLoop` fires on timed-out packet
+  - `retransmitLoop` drops packet after `MaxRetransmits`
+  - `Stats()` counts sessions and streams
+  - NACK forcing immediate retransmit via zeroed send time
+  - Session isolation (stream removal in one session does not affect another)
+  - Channel-full drop safety
+
+### Makefile Updates
+
+- Added `test-hybridbridge` target: `go test -v -race -count=1 ./internal/hybridbridge/...`
+- Added `lint-hybridbridge` target: `go vet ./internal/hybridbridge/...`
+- Updated `test` and `lint` aggregate targets to include HybridBridge.
+
+### Compatibility
+
+- Neither MasterDNS nor spoof-tunnel was modified.
+- `ControlPlane` and `DataPlane` are interface types; integration is plugged
+  in at startup without requiring either submodule to import the other.
+
+### Validation Status
+
+- All 20 bridge tests pass (`go test -v -race -count=1 ./internal/hybridbridge/...`).
+- All existing MasterDNS and Spoof-Tunnel tests continue to pass.
+
+---
+
+## Phase 5+ (Pending)
+
+Notes for subsequent phases will be added as work completes.

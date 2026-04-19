@@ -124,25 +124,25 @@ Upgrade spoof downstream reliability to production behavior under reorder/loss.
 
 ### Tasks
 
-- [ ] Replace simplistic receive tracking with true reassembly buffer:
-  - [ ] out-of-order map/ring
-  - [ ] contiguous delivery cursor
-  - [ ] duplicate suppression
-- [ ] Improve send buffer/retransmit:
-  - [ ] dynamic RTO
-  - [ ] retry limits per packet and per stream
-  - [ ] retransmit prioritization
-- [ ] Implement explicit ACK/NACK generation hooks for upstream tunneling.
-- [ ] Add memory bounds:
-  - [ ] max reorder slots
-  - [ ] max in-flight bytes
-  - [ ] eviction and fail-safe rules
-- [ ] Keep compatibility mode for standalone spoof deployment until full migration.
+- [x] Replace simplistic receive tracking with true reassembly buffer:
+  - [x] out-of-order map/ring
+  - [x] contiguous delivery cursor
+  - [x] duplicate suppression
+- [x] Improve send buffer/retransmit:
+  - [x] dynamic RTO
+  - [x] retry limits per packet and per stream
+  - [x] retransmit prioritization
+- [x] Implement explicit ACK/NACK generation hooks for upstream tunneling.
+- [x] Add memory bounds:
+  - [x] max reorder slots
+  - [x] max in-flight bytes
+  - [x] eviction and fail-safe rules
+- [x] Keep compatibility mode for standalone spoof deployment until full migration.
 
 ### Done Criteria
 
-- [ ] Loss/reorder integration tests pass
-- [ ] No unbounded memory growth in stress tests
+- [x] Loss/reorder integration tests pass
+- [x] No unbounded memory growth in stress tests
 
 ---
 
@@ -154,26 +154,26 @@ Implement `hybridbridge` runtime and connect both sides.
 
 ### Tasks
 
-- [ ] Implement `Bridge` manager with loops:
-  - [ ] `controlRxLoop`
-  - [ ] `downRxLoop`
-  - [ ] `schedulerLoop`
-  - [ ] `ackFlushLoop`
-  - [ ] `retransmitLoop`
-  - [ ] `metricsLoop`
-- [ ] Implement stream lifecycle state machine:
-  - [ ] opening, active, draining, closed, reset
-- [ ] Implement session/stream mapping:
-  - [ ] MasterDNS stream ID <-> Hybrid stream ID
-  - [ ] spoof flow association
-- [ ] Implement ACK/NACK feedback tunnel:
-  - [ ] downlink receive stats -> MasterDNS control frames
-- [ ] Implement graceful and forced teardown semantics.
+- [x] Implement `Bridge` manager with loops:
+  - [x] `controlRxLoop`
+  - [x] `downRxLoop`
+  - [x] `schedulerLoop`
+  - [x] `ackFlushLoop`
+  - [x] `retransmitLoop`
+  - [x] `metricsLoop`
+- [x] Implement stream lifecycle state machine:
+  - [x] opening, active, draining, closed, reset
+- [x] Implement session/stream mapping:
+  - [x] MasterDNS stream ID <-> Hybrid stream ID
+  - [x] spoof flow association
+- [x] Implement ACK/NACK feedback tunnel:
+  - [x] downlink receive stats -> MasterDNS control frames
+- [x] Implement graceful and forced teardown semantics.
 
 ### Done Criteria
 
-- [ ] Single-stream end-to-end asymmetric flow works reliably
-- [ ] No panic/leak in stop/start loops
+- [x] Single-stream end-to-end asymmetric flow works reliably
+- [x] No panic/leak in stop/start loops
 
 ---
 
